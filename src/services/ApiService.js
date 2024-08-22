@@ -75,6 +75,14 @@ class ApiService {
         );
     }
 
+    async event(id) {
+        return this.handleResponse(this.api.get(`/events/${id}`));
+    }
+
+    async users() {
+        return this.handleResponse(this.api.get('/users'));
+    }
+
     async request(method, url, data = null) {
         const options = {
             method,
