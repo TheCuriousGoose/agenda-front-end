@@ -43,7 +43,7 @@ function formatMonthText(monthNumber) {
 
 function getDaysInMonth(year, month) {
     const date = new Date(year, month - 1, 1);
-    firstDayOffset.value = date.getDay(); // Get the day of the week the month starts on
+    firstDayOffset.value = date.getDay();
     date.setMonth(month);
     date.setDate(0);
     return Array.from({ length: date.getDate() }, (_, i) => i + 1);
@@ -116,11 +116,72 @@ function isWeekend(dayNumber) {
     return date.getDay() === 0 || date.getDay() === 6;
 }
 
-async function openEventModal(event) {
-    let eventResponse = await apiService.event(event.id);
-    modalEvent.value = eventResponse.event;
+async function openEventModal(event = null, day = 0) {
+    if (!event) {
+        let date = new Date(currentYear.value, currentMonth.value - 1, day, 8, 30);
+        modalEvent.value = {
+            title: '',
+            description: '',
+            start_date: formatDateForInput(date),
+            end_date: formatDateForInput(new Date(date.setMinutes(date.getMinutes() + 30))),
+            users: []
+        };
+
+        console.log(modalEvent.value);
+    } else {
+        let eventResponse = await apiService.event(event.id);
+        modalEvent.value = eventResponse.event;
+    }
     const modal = new Modal(document.getElementById('eventModal'));
     modal.show();
+}
+
+function formatDateForInput(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+
+async function saveEvent() {
+    try {
+        let data = {
+            title: modalEvent.value.title,
+            description: modalEvent.value.title,
+            start_date: modalEvent.value.start_date,
+            end_date: modalEvent.value.end_date,
+            users: modalEvent.value.users.map((user) => user.id)
+        }
+
+        if (modalEvent.value.id != null) {
+            await apiService.saveEvent(modalEvent.value.id, data);
+        } else {
+            await apiService.createEvent(data);
+
+        }
+
+        closeModal();
+
+        await fetchEvents(currentMonth.value, currentYear.value);
+    } catch (error) {
+        console.error("Failed to save the event", error);
+    }
+}
+
+function closeModal() {
+    const modal = Modal.getInstance(document.getElementById('eventModal'));
+    modal.hide();
+
+    modalEvent.value = {
+        title: '',
+        description: '',
+        start_date: '',
+        end_date: '',
+        users: []
+    }
 }
 
 onMounted(async () => {
@@ -141,6 +202,12 @@ const selectedUserIds = computed({
         modalEvent.value.users = users.value.filter(user => newIds.includes(user.id));
     }
 });
+
+async function deleteEvent() {
+    await apiService.deleteEvent(modalEvent.value.id);
+    closeModal();
+    await fetchEvents(currentMonth.value, currentYear.value);
+}
 </script>
 
 <template>
@@ -162,7 +229,8 @@ const selectedUserIds = computed({
             }">
                 <div class="d-flex">
                     <div style="width: 1rem" v-if="userRole == 'office' || userRole == 'management'">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"
+                            @click="openEventModal(null, day)">
                             <path
                                 d="M256 80c0-17.7-14.3-32-32-32s-32 14.3-32 32l0 144L48 224c-17.7 0-32 14.3-32 32s14.3 32 32 32l144 0 0 144c0 17.7 14.3 32 32 32s32-14.3 32-32l0-144 144 0c17.7 0 32-14.3 32-32s-14.3-32-32-32l-144 0 0-144z" />
                         </svg>
@@ -180,12 +248,13 @@ const selectedUserIds = computed({
             </div>
         </div>
     </main>
-    <div class="modal modal-lg" id="eventModal">
+    <div class="modal modal-lg static" id="eventModal" data-bs-backdrop="static">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Event Details</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"
+                        @click="closeModal()"></button>
                 </div>
                 <div class="modal-body">
                     <div v-if="userRole == 'user'">
@@ -231,9 +300,15 @@ const selectedUserIds = computed({
                             </div>
                         </div>
                         <hr class="mt-5">
-                        <button class="btn btn-primary">
-                            Save
-                        </button>
+                        <div class="gap-2 d-flex">
+                            <button class="btn btn-primary" @click="saveEvent">
+                                Save
+                            </button>
+                            <button class="btn btn-danger" v-if="userRole == 'management' && modalEvent.id != null"
+                                @click="deleteEvent">
+                                Delete
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

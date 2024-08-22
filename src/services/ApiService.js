@@ -79,6 +79,18 @@ class ApiService {
         return this.handleResponse(this.api.get(`/events/${id}`));
     }
 
+    async saveEvent(id, data){
+        return this.handleResponse(this.api.put(`/events/${id}`, data));
+    }
+
+    async createEvent(data){
+        return this.handleResponse(this.api.post(`/events`, data));
+    }
+
+    async deleteEvent(id){
+        return this.handleResponse(this.api.delete(`/events/${id}`));
+    } 
+
     async users() {
         return this.handleResponse(this.api.get('/users'));
     }
